@@ -2,7 +2,7 @@ name: Deploy Minimal Blog
 
 on:
   push:
-    branches: ["master", "main"] 
+    branches: ["master"] 
   workflow_dispatch:
 
 permissions:
@@ -13,6 +13,9 @@ permissions:
 concurrency:
   group: "pages"
   cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build:
