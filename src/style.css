@@ -1,0 +1,16 @@
+body {
+    font-family: system-ui, -apple-system, sans-serif;
+    line-height: 1.6;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+    color: #333;
+    background: #fafafa;
+}
+
+/* Ensure code blocks have padding and scroll horizontally */
+pre.shiki {
+    padding: 1rem;
+    border-radius: 6px;
+    overflow-x: auto;
+}
