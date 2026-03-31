@@ -34,6 +34,9 @@ jobs:
         
       - name: Build site
         run: bun run build
+      
+      - name: Copy CNAME to dist
+        run: cp CNAME ./dist/CNAME
         
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
