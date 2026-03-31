@@ -29,7 +29,7 @@ async function build() {
   await fs.copyFile('./src/style.css', path.join(DIST_DIR, 'style.css'));
 
   // 4. Recursive function to read all markdown files and mirror the folder structure
-  async function processDirectory(dir: string) {
+  async function processDirectory(dir) {
     const entries = await fs.readdir(dir, { withFileTypes: true });
 
     for (const entry of entries) {
@@ -50,7 +50,7 @@ async function build() {
         
         // Parse YAML frontmatter (like title) and the raw markdown body
         const { data, content } = matter(fileContent);
-        const title = data.title || 'My Blog';
+        const title = data.title || 'Vilhelm.se';
 
         // Render markdown asynchronously (required for the Shiki plugin to work)
         const htmlContent = await md.renderAsync(content);
