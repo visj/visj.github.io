@@ -1,4 +1,4 @@
 ---
-title: My First Post
+title: Vilhelms blogg
 ---
-# Hello World
+# Hej världen
