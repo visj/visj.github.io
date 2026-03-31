@@ -15,10 +15,7 @@ async function build() {
   // 2. Add Shiki plugin for syntax highlighting
   // This will automatically handle tokenizing code blocks asynchronously
   md.use(Shiki({
-    themes: {
-      light: 'github-light',
-      dark: 'github-dark',
-    }
+    theme: 'light-plus'
   }));
 
   // 3. Prepare directories and load the HTML template

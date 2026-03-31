@@ -8,9 +8,10 @@ body {
     background: #fafafa;
 }
 
-/* Ensure code blocks have padding and scroll horizontally */
 pre.shiki {
-    padding: 1rem;
+    background-color: #FFFCF2 !important;
+    border: 1px solid #e1e4e8;
+    padding: 16px;
     border-radius: 6px;
     overflow-x: auto;
 }
