@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "bundle": "bun build src/shiki.js --outfile assets/js/shiki.js --minify --target browser && bun build src/langs/bash.js src/langs/css.js src/langs/go.js src/langs/html.js src/langs/javascript.js src/langs/json.js src/langs/rust.js src/langs/typescript.js --outdir assets/js/langs --minify --target browser"
+    "bundle": "bun run scripts/bundle.js",
+    "build": "go run main.go"
   },
   "dependencies": {
     "shiki": "^1.0.0"

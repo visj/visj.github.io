@@ -12,6 +12,8 @@ createHighlighterCore({
         var lang = match ? match[1] : 'text'
         var html = hl.codeToHtml(el.textContent, { lang: lang, theme: 'light-plus' })
         var pre = el.closest('pre')
-        if (pre) pre.outerHTML = html
+        if (pre) {
+            pre.outerHTML = html
+        }
     })
 })
