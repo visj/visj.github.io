@@ -1,0 +1,7 @@
+name = "visj"
+pages_build_output_dir = "dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "vilhelm"
+database_id = "09b75c99-1489-4bf9-9ba0-5418b5b48742"

@@ -1,0 +1,55 @@
+<head>
+    <title>Kontakt</title>
+    <meta name="layout" content="wide">
+</head>
+<body>
+    <h1>Kontakt</h1>
+    <p>Skicka ett meddelande här nedan eller mejla direkt på <a href="mailto:mitt.namn@gmail.com">mitt.namn@gmail.com</a>.</p>
+
+    <form class="contact-form" id="contact-form">
+        <div class="form-field">
+            <label for="cf-name">Namn</label>
+            <input id="cf-name" type="text" name="name" required>
+        </div>
+        <div class="form-field">
+            <label for="cf-email">E-post <span class="field-optional">(valfritt)</span></label>
+            <input id="cf-email" type="email" name="email">
+        </div>
+        <div class="form-field">
+            <label for="cf-message">Meddelande</label>
+            <textarea id="cf-message" name="message" rows="6" required></textarea>
+        </div>
+        <div class="cf-turnstile" data-sitekey="0x4AAAAAADQiKUKHRY-f0Np2" data-theme="light"></div>
+        <button type="submit">Skicka</button>
+        <p class="form-status" id="cf-status"></p>
+    </form>
+
+    <script>
+    document.getElementById('contact-form').addEventListener('submit', async function(e) {
+        e.preventDefault()
+        const btn = this.querySelector('button[type=submit]')
+        const status = document.getElementById('cf-status')
+        btn.disabled = true
+        status.textContent = ''
+        try {
+            const r = await fetch('/api/contact', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: this.name.value,
+                    email: this.email.value,
+                    message: this.message.value,
+                    turnstileToken: this['cf-turnstile-response']?.value ?? '',
+                }),
+            })
+            status.textContent = r.ok
+                ? 'Tack! Jag återkommer så snart jag kan.'
+                : 'Något gick fel — försök igen eller mejla direkt.'
+            if (r.ok) { this.reset(); turnstile.reset() }
+        } catch {
+            status.textContent = 'Kunde inte skicka. Kontrollera anslutningen.'
+        }
+        btn.disabled = false
+    })
+    </script>
+</body>

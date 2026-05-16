@@ -1,24 +1,34 @@
 <!DOCTYPE html>
 <html lang="sv">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="/css/style.css">
-    {{HEAD}}
-</head>
-<body>
-    <div class="container">
+
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="/css/style.css">
+        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+
+        {{HEAD}}
+    </head>
+
+    <body>
         <nav>
-            <a class="nav-brand" href="/">Vilhelm</a>
-            <ul class="nav-menu">
-                <li><a href="/amnen">Ämnen</a></li>
-                <li><a href="/en">English</a></li>
-            </ul>
+            <div class="nav-menu">
+                <div class="nav-brand">
+                    <a href="/">Vilhelm</a>
+                </div>
+                <ul class="nav-links">
+                    <li><a href="/bladdra">Bläddra</a></li>
+                    <li><a href="/amnen">Ämnen</a></li>
+                    <li><a href="/skribenter">Skribenter</a></li>
+                    <li><a href="/kontakt">Kontakt</a></li>
+                </ul>
+                <div class="nav-right"></div>
+            </div>
         </nav>
         <main>
+
             {{BODY}}
         </main>
-    </div>
-    <script src="/js/shared.js"></script>
-</body>
+    </body>
+
 </html>

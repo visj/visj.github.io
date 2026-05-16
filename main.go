@@ -24,7 +24,10 @@ import (
 )
 
 const (
-	contentDir = "content"
+	viewsDir   = "views"
+	postsDir   = "views/posts"
+	authorsDir = "views/authors"
+	pagesDir   = "views/pages"
 	assetsDir  = "assets"
 	distDir    = "dist"
 	layoutFile = "layout.html"
@@ -35,11 +38,19 @@ const (
 
 type Post struct {
 	Title       string
+	Author      string
 	Description string
 	Date        string
 	Tags        []string
 	Lang        string // "sv" or "en"
 	URL         string // e.g. "/om-brev" or "/en/on-letters"
+	DestPath    string // path of rendered file inside dist/
+}
+
+type postSource struct {
+	path string
+	src  string
+	date string
 }
 
 // ── Entry point ───────────────────────────────────────────────────────────────
@@ -79,39 +90,140 @@ func build() error {
 	if err != nil {
 		return err
 	}
-	return generateTopics(string(layout), posts)
+	if err := generateTopics(string(layout), posts); err != nil {
+		return err
+	}
+	return generateBrowse(string(layout), posts)
 }
 
-// renderContent walks content/, renders each HTML file, and returns post metadata
-// for files that have a date meta tag (i.e. are posts, not pages).
 func renderContent(layout string) ([]Post, error) {
-	var posts []Post
-	err := filepath.Walk(contentDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() || !strings.HasSuffix(path, ".html") {
+	if err := renderPages(layout); err != nil {
+		return nil, err
+	}
+	if err := renderAuthors(layout); err != nil {
+		return nil, err
+	}
+	return renderPosts(layout)
+}
+
+// renderPosts walks views/posts/, sorts by date, injects next-post links, and
+// copies the newest post to dist/index.html.
+func renderPosts(layout string) ([]Post, error) {
+	var all []postSource
+	if err := walkViewDir(postsDir, "", func(path, src string) error {
+		head := extractBetween(src, "<head>", "</head>")
+		all = append(all, postSource{path: path, src: src, date: extractMeta(head, "date")})
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	sort.Slice(all, func(i, j int) bool { return all[i].date > all[j].date })
+
+	metas := make([]Post, len(all))
+	for i, s := range all {
+		head := extractBetween(s.src, "<head>", "</head>")
+		metas[i] = Post{Title: extractBetween(head, "<title>", "</title>"), URL: urlFromPath(s.path)}
+	}
+
+	posts := make([]Post, len(all))
+	for i, s := range all {
+		var next *Post
+		if i+1 < len(metas) {
+			next = &metas[i+1]
+		}
+		post, err := renderFile(s.path, s.src, layout, next)
+		if err != nil {
+			return nil, err
+		}
+		posts[i] = post
+	}
+
+	if len(posts) > 0 {
+		indexPath := filepath.Join(distDir, "index.html")
+		if posts[0].DestPath != indexPath {
+			if err := copyFile(posts[0].DestPath, indexPath); err != nil {
+				return nil, err
+			}
+			fmt.Printf("index: %s\n", posts[0].URL)
+		}
+	}
+	return posts, nil
+}
+
+// renderPages walks views/pages/ and renders each as a plain static page.
+func renderPages(layout string) error {
+	return walkViewDir(pagesDir, "", func(path, src string) error {
+		_, err := renderFile(path, src, layout, nil)
+		return err
+	})
+}
+
+// renderAuthors walks views/authors/, renders each bio page, and generates
+// the /skribenter index listing all authors.
+func renderAuthors(layout string) error {
+	type authorEntry struct {
+		Name string
+		URL  string
+	}
+	var authors []authorEntry
+
+	if err := walkViewDir(authorsDir, "skribenter", func(path, src string) error {
+		post, err := renderFile(path, src, layout, nil)
+		if err != nil {
 			return err
+		}
+		authors = append(authors, authorEntry{Name: post.Title, URL: post.URL})
+		return nil
+	}); err != nil {
+		return err
+	}
+	if len(authors) == 0 {
+		return nil
+	}
+	sort.Slice(authors, func(i, j int) bool { return authors[i].Name < authors[j].Name })
+
+	var b strings.Builder
+	b.WriteString("<h1>Skribenter</h1>\n<ul class=\"post-list\">\n")
+	for _, a := range authors {
+		b.WriteString(fmt.Sprintf("\t<li><a href=\"%s\">%s</a></li>\n", a.URL, a.Name))
+	}
+	b.WriteString("</ul>\n")
+	return writePage(layout, "/skribenter/index.html", "<title>Skribenter</title>", b.String())
+}
+
+// walkViewDir walks a views sub-directory, copies non-HTML assets to dist
+// under distPrefix, and calls fn for each HTML file.
+func walkViewDir(dir, distPrefix string, fn func(path, src string) error) error {
+	return filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return err
+		}
+		if filepath.Base(path) == "comments.html" {
+			return nil // included by renderFile, not rendered standalone
+		}
+		if !strings.HasSuffix(path, ".html") {
+			rel, _ := filepath.Rel(dir, path)
+			dest := filepath.Join(distDir, distPrefix, rel)
+			if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
+				return err
+			}
+			return copyFile(path, dest)
 		}
 		src, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
-		post, err := renderFile(path, string(src), layout)
-		if err != nil {
-			return err
-		}
-		if post.Date != "" {
-			posts = append(posts, post)
-		}
-		return nil
+		return fn(path, string(src))
 	})
-	return posts, err
 }
 
-func renderFile(path, src, layout string) (Post, error) {
+func renderFile(path, src, layout string, next *Post) (Post, error) {
 	head := extractBetween(src, "<head>", "</head>")
 	body := extractBetween(src, "<body>", "</body>")
 
 	title := extractBetween(head, "<title>", "</title>")
 	date := extractMeta(head, "date")
+	author := extractMeta(head, "author")
 	description := extractMeta(head, "description")
 	tagsRaw := extractMeta(head, "tags")
 
@@ -122,11 +234,33 @@ func renderFile(path, src, layout string) (Post, error) {
 		}
 	}
 
-	out := strings.ReplaceAll(layout, "{{HEAD}}", head)
-	out = strings.ReplaceAll(out, "{{BODY}}", body)
+	isPost := strings.HasPrefix(filepath.ToSlash(path), "views/posts/")
+	if isPost {
+		body += commentSection(path, urlFromPath(path))
+	}
+	if next != nil {
+		body += fmt.Sprintf("\n<div class=\"post-nav\"><a href=\"%s\">%s →</a></div>", next.URL, next.Title)
+	}
 
-	rel, _ := filepath.Rel(contentDir, path)
-	dest := filepath.Join(distDir, rel)
+	container := "container"
+	if extractMeta(head, "layout") == "wide" {
+		container = "meta-container"
+	}
+	scripts := "<script src=\"/js/article.js\"></script>"
+	if isPost {
+		scripts += "\n<script src=\"/js/comments.js\"></script>"
+	}
+	wrapped := "<div class=\"" + container + "\">\n" + body + "\n</div>\n" + scripts
+	out := strings.ReplaceAll(layout, "{{HEAD}}", head)
+	out = strings.ReplaceAll(out, "{{BODY}}", wrapped)
+
+	url := urlFromPath(path)
+	var dest string
+	if url == "/" {
+		dest = filepath.Join(distDir, "index.html")
+	} else {
+		dest = filepath.Join(distDir, filepath.FromSlash(strings.TrimPrefix(url, "/")), "index.html")
+	}
 	if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
 		return Post{}, err
 	}
@@ -137,34 +271,84 @@ func renderFile(path, src, layout string) (Post, error) {
 
 	return Post{
 		Title:       title,
+		Author:      author,
 		Description: description,
 		Date:        date,
 		Tags:        tags,
 		Lang:        langFromPath(path),
 		URL:         urlFromPath(path),
+		DestPath:    dest,
 	}, nil
+}
+
+func commentSection(path, postURL string) string {
+	slug := strings.TrimPrefix(postURL, "/")
+	var existing string
+	if data, err := os.ReadFile(filepath.Join(filepath.Dir(path), "comments.html")); err == nil {
+		existing = "\n" + string(data)
+	}
+	return fmt.Sprintf(`
+<section class="comments" data-post="%s">
+<h2>Kommentarer</h2>%s
+<div class="comment-form-wrap">
+<h3>Lämna en kommentar</h3>
+<div class="reply-notice" style="display:none">
+  Svarar på: <span class="reply-to-name"></span>
+  <button class="cancel-reply" type="button">×</button>
+</div>
+<form class="comment-form">
+  <input type="hidden" name="parent_id" value="">
+  <div class="form-field"><label for="c-name">Namn</label><input id="c-name" type="text" name="name" required></div>
+  <div class="form-field"><label for="c-email">E-post</label><input id="c-email" type="email" name="email" required></div>
+  <div class="form-field"><label for="c-text">Kommentar</label><textarea id="c-text" name="comment" rows="4" required></textarea></div>
+  <div class="cf-turnstile" data-sitekey="0x4AAAAAADQiKUKHRY-f0Np2" data-theme="light"></div>
+  <button type="submit">Skicka kommentar</button>
+  <p class="form-status"></p>
+</form>
+</div>
+</section>`, slug, existing)
+}
+
+// ── Topic / tag page generation ───────────────────────────────────────────────
+
+// ── Browse page ───────────────────────────────────────────────────────────────
+
+func generateBrowse(layout string, posts []Post) error {
+	if len(posts) == 0 {
+		return nil
+	}
+	sorted := make([]Post, len(posts))
+	copy(sorted, posts)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Date > sorted[j].Date })
+
+	var b strings.Builder
+	b.WriteString("<h1>Bläddra</h1>\n<div class=\"browse-grid\">\n")
+	for _, p := range sorted {
+		b.WriteString("\t<div class=\"card\">\n")
+		b.WriteString(fmt.Sprintf("\t\t<a class=\"card-link\" href=\"%s\">\n", p.URL))
+		b.WriteString(fmt.Sprintf("\t\t\t<h3>%s</h3>\n", p.Title))
+		meta := p.Date
+		if p.Author != "" {
+			meta = p.Author + " · " + meta
+		}
+		if meta != "" {
+			b.WriteString(fmt.Sprintf("\t\t\t<p class=\"card-meta\">%s</p>\n", meta))
+		}
+		if p.Description != "" {
+			b.WriteString(fmt.Sprintf("\t\t\t<p class=\"card-desc\">%s</p>\n", p.Description))
+		}
+		b.WriteString("\t\t</a>\n")
+		b.WriteString("\t</div>\n")
+	}
+	b.WriteString("</div>\n")
+
+	return writePage(layout, "/bladdra/index.html", "<title>Bläddra</title>", b.String())
 }
 
 // ── Topic / tag page generation ───────────────────────────────────────────────
 
 func generateTopics(layout string, posts []Post) error {
-	var sv, en []Post
-	for _, p := range posts {
-		if p.Lang == "en" {
-			en = append(en, p)
-		} else {
-			sv = append(sv, p)
-		}
-	}
-	if err := generateTagPages(layout, sv, "/amnen", "Ämnen", "← Alla ämnen"); err != nil {
-		return err
-	}
-	if len(en) > 0 {
-		if err := generateTagPages(layout, en, "/en/topics", "Topics", "← All topics"); err != nil {
-			return err
-		}
-	}
-	return nil
+	return generateTagPages(layout, posts, "/amnen", "Ämnen", "← Alla ämnen")
 }
 
 func generateTagPages(layout string, posts []Post, base, indexTitle, backLabel string) error {
@@ -231,8 +415,12 @@ func generateTagPages(layout string, posts []Post, base, indexTitle, backLabel s
 }
 
 func writePage(layout, path, head, body string) error {
+	wrapped := "<div class=\"meta-container\">\n" + body + "\n</div>"
 	out := strings.ReplaceAll(layout, "{{HEAD}}", head)
-	out = strings.ReplaceAll(out, "{{BODY}}", body)
+	out = strings.ReplaceAll(out, "{{BODY}}", wrapped)
+	if !strings.HasSuffix(path, "/index.html") && strings.HasSuffix(path, ".html") {
+		path = strings.TrimSuffix(path, ".html") + "/index.html"
+	}
 	dest := filepath.Join(distDir, filepath.FromSlash(path))
 	if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
 		return err
@@ -297,21 +485,54 @@ func extractAttr(tag, attr string) string {
 // ── Path helpers ──────────────────────────────────────────────────────────────
 
 func langFromPath(path string) string {
-	rel, _ := filepath.Rel(contentDir, path)
+	// English posts live under views/posts/en/
+	rel, _ := filepath.Rel(postsDir, path)
 	parts := strings.SplitN(filepath.ToSlash(rel), "/", 2)
-	if len(parts) > 1 && parts[0] == "en" {
+	if len(parts) > 0 && parts[0] == "en" {
 		return "en"
 	}
 	return "sv"
 }
 
 func urlFromPath(path string) string {
-	rel, _ := filepath.Rel(contentDir, path)
-	url := "/" + strings.TrimSuffix(filepath.ToSlash(rel), ".html")
-	if strings.HasSuffix(url, "/index") {
-		url = strings.TrimSuffix(url, "index")
+	abs, _ := filepath.Abs(path)
+
+	tryStrip := func(base, urlPrefix string) (string, bool) {
+		absBase, _ := filepath.Abs(base)
+		rel, err := filepath.Rel(absBase, abs)
+		if err != nil || strings.HasPrefix(rel, "..") {
+			return "", false
+		}
+		s := filepath.ToSlash(rel)
+		s = strings.TrimSuffix(s, ".html")
+		if strings.HasSuffix(s, "/index") {
+			s = strings.TrimSuffix(s, "/index")
+		}
+		if s == "index" {
+			s = ""
+		}
+		if urlPrefix != "" {
+			return "/" + urlPrefix + "/" + s, true
+		}
+		return "/" + s, true
 	}
-	return strings.TrimSuffix(url, "/")
+
+	if url, ok := tryStrip(authorsDir, "skribenter"); ok {
+		return url
+	}
+	if url, ok := tryStrip(postsDir, ""); ok {
+		return url
+	}
+	if url, ok := tryStrip(pagesDir, ""); ok {
+		return url
+	}
+	// fallback
+	rel, _ := filepath.Rel(viewsDir, path)
+	s := strings.TrimSuffix(filepath.ToSlash(rel), ".html")
+	if strings.HasSuffix(s, "/index") {
+		s = strings.TrimSuffix(s, "/index")
+	}
+	return "/" + s
 }
 
 // ── String helpers ────────────────────────────────────────────────────────────
@@ -400,7 +621,7 @@ func watchAndRebuild() {
 
 func latestMod(since time.Time) (time.Time, bool) {
 	var latest time.Time
-	for _, root := range []string{contentDir, assetsDir, layoutFile} {
+	for _, root := range []string{viewsDir, assetsDir, layoutFile} {
 		_ = filepath.Walk(root, func(_ string, info os.FileInfo, err error) error {
 			if err != nil || info.IsDir() {
 				return nil
