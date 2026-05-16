@@ -103,7 +103,12 @@ func build() error {
 	if p, ok := am["/css/style.css"]; ok {
 		cssLink = `<link rel="stylesheet" href="` + p + `">`
 	}
+	navJS := ""
+	if p, ok := am["/js/nav.js"]; ok {
+		navJS = `<script src="` + p + `"></script>`
+	}
 	layoutStr := strings.ReplaceAll(string(layout), "{{GLOBALCSS}}", cssLink)
+	layoutStr = strings.ReplaceAll(layoutStr, "{{NAVJS}}", navJS)
 
 	posts, err := renderContent(layoutStr)
 	if err != nil {
@@ -304,7 +309,7 @@ func renderFile(path, src, layout string, next *Post) (Post, error) {
 		return Post{}, err
 	}
 	fmt.Printf("built: %s\n", dest)
-	if err := os.WriteFile(dest, []byte(out), 0644); err != nil {
+	if err := os.WriteFile(dest, []byte(minifyHTML(out)), 0644); err != nil {
 		return Post{}, err
 	}
 
@@ -465,7 +470,7 @@ func writePage(layout, path, head, body string) error {
 		return err
 	}
 	fmt.Printf("generated: %s\n", dest)
-	return os.WriteFile(dest, []byte(out), 0644)
+	return os.WriteFile(dest, []byte(minifyHTML(out)), 0644)
 }
 
 // ── Metadata extraction ───────────────────────────────────────────────────────
@@ -646,7 +651,7 @@ func buildGlobalAssetMap() (map[string]string, error) {
 
 	// JS: Bun already minified these into assets/js/; copyDir put them in
 	// dist/js/. Hash and rename them there.
-	for _, name := range []string{"article.js", "comments.js"} {
+	for _, name := range []string{"article.js", "comments.js", "nav.js"} {
 		distPath := filepath.Join(distDir, "js", name)
 		data, err := os.ReadFile(distPath)
 		if err != nil {
@@ -782,6 +787,113 @@ func minifyCSS(s string) string {
 	s = strings.ReplaceAll(s, ";}", "}")
 
 	return strings.TrimSpace(s)
+}
+
+// minifyHTML collapses whitespace in text nodes and strips HTML comments.
+// Content inside <pre>, <script>, <style>, and <textarea> is passed through
+// verbatim. IE conditional comments (<!--[if ...]) are preserved.
+func minifyHTML(s string) string {
+	var buf strings.Builder
+	buf.Grow(len(s))
+	i, n := 0, len(s)
+	verbatim := false
+	verbatimClose := ""
+
+	for i < n {
+		if verbatim {
+			idx := strings.Index(strings.ToLower(s[i:]), verbatimClose)
+			if idx == -1 {
+				buf.WriteString(s[i:])
+				return buf.String()
+			}
+			closeEnd := i + idx + len(verbatimClose)
+			buf.WriteString(s[i:closeEnd])
+			i = closeEnd
+			verbatim = false
+			continue
+		}
+
+		if strings.HasPrefix(s[i:], "<!--") {
+			if strings.HasPrefix(s[i+4:], "[") { // IE conditional <!--[if ...]-->
+				end := strings.Index(s[i:], "-->")
+				if end == -1 {
+					buf.WriteString(s[i:])
+					return buf.String()
+				}
+				buf.WriteString(s[i : i+end+3])
+				i += end + 3
+			} else {
+				end := strings.Index(s[i:], "-->")
+				if end == -1 {
+					return buf.String()
+				}
+				i += end + 3
+			}
+			continue
+		}
+
+		if s[i] == '<' {
+			end := i + 1
+			var q byte
+			for end < n {
+				c := s[end]
+				if q != 0 {
+					if c == q {
+						q = 0
+					}
+				} else if c == '"' || c == '\'' {
+					q = c
+				} else if c == '>' {
+					end++
+					break
+				}
+				end++
+			}
+			tag := s[i:end]
+			buf.WriteString(tag)
+			inner := tag[1:]
+			if len(inner) > 0 && inner[0] != '/' && inner[0] != '!' {
+				for _, vt := range []string{"pre", "script", "style", "textarea"} {
+					if strings.HasPrefix(strings.ToLower(inner), vt) {
+						rest := inner[len(vt):]
+						if len(rest) == 0 || rest[0] == ' ' || rest[0] == '\t' || rest[0] == '\n' || rest[0] == '\r' || rest[0] == '>' || rest[0] == '/' {
+							verbatim = true
+							verbatimClose = "</" + vt + ">"
+							break
+						}
+					}
+				}
+			}
+			i = end
+			continue
+		}
+
+		j := i
+		for j < n && s[j] != '<' {
+			j++
+		}
+		buf.WriteString(collapseSpace(s[i:j]))
+		i = j
+	}
+	return buf.String()
+}
+
+func collapseSpace(s string) string {
+	var buf []byte
+	prevWS := false
+	for k := 0; k < len(s); k++ {
+		c := s[k]
+		if c == ' ' || c == '\t' || c == '\n' || c == '\r' {
+			if !prevWS {
+				buf = append(buf, ' ')
+				prevWS = true
+			}
+		} else {
+			buf = append(buf, c)
+			prevWS = false
+		}
+	}
+	return string(buf)
 }
 
 // ── Assets ────────────────────────────────────────────────────────────────────

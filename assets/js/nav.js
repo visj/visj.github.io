@@ -1,0 +1,1 @@
+(function(){var n=document.querySelector("nav"),e=!1;window.addEventListener("scroll",function(){if(!e)requestAnimationFrame(function(){n.classList.toggle("nav-scrolled",window.scrollY>0),e=!1}),e=!0},{passive:!0})})();

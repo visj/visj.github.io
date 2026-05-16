@@ -2,7 +2,7 @@ import { build } from 'bun'
 
 const opts = { minify: true, target: 'browser' }
 
-await build({ ...opts, entrypoints: ['src/article.js', 'src/comments.js'], outdir: 'assets/js' })
+await build({ ...opts, entrypoints: ['src/article.js', 'src/comments.js', 'src/nav.js'], outdir: 'assets/js' })
 await build({ ...opts, entrypoints: ['src/shiki.js'], outdir: 'assets/js' })
 
 await build({
