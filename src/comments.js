@@ -38,6 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const id = 'c-' + Math.random().toString(36).slice(2, 8)
     try {
+      const turnstileInput = form.querySelector('[name="cf-turnstile-response"]')
       const r = await fetch('/api/comment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -48,6 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
           name: form.querySelector('[name=name]').value,
           email: form.querySelector('[name=email]').value,
           comment: form.querySelector('[name=comment]').value,
+          turnstileToken: turnstileInput ? turnstileInput.value : '',
         }),
       })
       if (r.ok) {

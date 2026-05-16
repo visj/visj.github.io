@@ -24,9 +24,9 @@ async function verifyTurnstile(token, secret) {
   return (await r.json()).success === true
 }
 
-function ok()             { return json({ ok: true }) }
-function err(s, msg)      { return json({ error: msg }, s) }
-function json(body, s=200) {
+function ok() { return json({ ok: true }) }
+function err(s, msg) { return json({ error: msg }, s) }
+function json(body, s = 200) {
   return new Response(JSON.stringify(body), { status: s, headers: { 'Content-Type': 'application/json' } })
 }
 function uid() { return crypto.randomUUID().slice(0, 8) }

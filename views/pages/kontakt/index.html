@@ -1,6 +1,7 @@
 <head>
     <title>Kontakt</title>
     <meta name="layout" content="wide">
+    {{TURNSTILE_SCRIPT}}
 </head>
 <body>
     <h1>Kontakt</h1>
@@ -19,6 +20,7 @@
             <label for="cf-message">Meddelande</label>
             <textarea id="cf-message" name="message" rows="6" required></textarea>
         </div>
+        {{TURNSTILE_WIDGET}}
         <button type="submit">Skicka</button>
         <p class="form-status" id="cf-status"></p>
     </form>
@@ -31,6 +33,7 @@
         btn.disabled = true
         status.textContent = ''
         try {
+            const turnstileInput = this.querySelector('[name="cf-turnstile-response"]')
             const r = await fetch('/api/contact', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -38,6 +41,7 @@
                     name: this.name.value,
                     email: this.email.value,
                     message: this.message.value,
+                    turnstileToken: turnstileInput ? turnstileInput.value : '',
                 }),
             })
             status.textContent = r.ok

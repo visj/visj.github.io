@@ -298,6 +298,13 @@ func renderFile(path, src, layout string, next *Post) (Post, error) {
 	wrapped := "<div class=\"" + container + "\">\n" + body + "\n</div>\n" + scripts
 	out := strings.ReplaceAll(layout, "{{HEAD}}", head)
 	out = strings.ReplaceAll(out, "{{BODY}}", wrapped)
+	turnstileScript, turnstileWidget := "", ""
+	if os.Getenv("TURNSTILE_SECRET") != "" {
+		turnstileScript = `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`
+		turnstileWidget = `<div class="cf-turnstile" data-sitekey="0x4AAAAAADQiKUKHRY-f0Np2" data-theme="light"></div>`
+	}
+	out = strings.ReplaceAll(out, "{{TURNSTILE_SCRIPT}}", turnstileScript)
+	out = strings.ReplaceAll(out, "{{TURNSTILE_WIDGET}}", turnstileWidget)
 
 	var dest string
 	if postURL == "/" {
@@ -333,7 +340,13 @@ func commentSection(path, postURL string) string {
 			commentsDiv = "<div class=\"comments-list\">\n<h2>Kommentarer</h2>\n" + content + "\n</div>\n"
 		}
 	}
-	return fmt.Sprintf(`<section class="comments" data-post="%s">
+	turnstileScript := ""
+	turnstileWidget := ""
+	if os.Getenv("TURNSTILE_SECRET") != "" {
+		turnstileScript = "<script src=\"https://challenges.cloudflare.com/turnstile/v0/api.js\" async defer></script>\n"
+		turnstileWidget = "\n  <div class=\"cf-turnstile\" data-sitekey=\"0x4AAAAAADQiKUKHRY-f0Np2\" data-theme=\"light\"></div>"
+	}
+	return fmt.Sprintf(`%s<section class="comments" data-post="%s">
 %s<div class="comment-form-wrap">
 <h3>Lämna en kommentar</h3>
 <div class="reply-notice" style="display:none">
@@ -344,13 +357,12 @@ func commentSection(path, postURL string) string {
   <input type="hidden" name="parent_id" value="">
   <div class="form-field"><label for="c-name">Namn</label><input id="c-name" type="text" name="name" required></div>
   <div class="form-field"><label for="c-email">E-post</label><input id="c-email" type="email" name="email" required></div>
-  <div class="form-field"><label for="c-text">Kommentar</label><textarea id="c-text" name="comment" rows="4" required></textarea></div>
-  <div class="cf-turnstile" data-sitekey="0x4AAAAAADQiKUKHRY-f0Np2" data-theme="light"></div>
+  <div class="form-field"><label for="c-text">Kommentar</label><textarea id="c-text" name="comment" rows="4" required></textarea></div>%s
   <button type="submit">Skicka kommentar</button>
   <p class="form-status"></p>
 </form>
 </div>
-</section>`, slug, commentsDiv)
+</section>`, turnstileScript, slug, commentsDiv, turnstileWidget)
 }
 
 // ── Topic / tag page generation ───────────────────────────────────────────────
