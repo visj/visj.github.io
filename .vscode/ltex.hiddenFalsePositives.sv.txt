@@ -1,0 +1,1 @@
+{"rule":"HUNSPELL_RULE","sentence":"^\\QDet lämnas här som en erinran om det intet företagnas malande natur.\\E$"}

@@ -421,7 +421,7 @@ pre code {
 button[type=submit] {
     font-family: inherit;
     font-size: 0.88rem;
-    background: #1a1a1a;
+    background: #be6f56;
     color: #fffffc;
     border: none;
     border-radius: 3px;
@@ -430,7 +430,7 @@ button[type=submit] {
     transition: background 0.15s;
 }
 
-button[type=submit]:hover { background: #333; }
+button[type=submit]:hover { background: #af401d; }
 button[type=submit]:disabled { opacity: 0.5; cursor: default; }
 
 .form-status {
@@ -445,7 +445,6 @@ button[type=submit]:disabled { opacity: 0.5; cursor: default; }
 .comments {
     margin-top: 1rem;
     padding-top: 1rem;
-    border-top: 1px solid #e5e5e5;
 }
 
 .comments h2, .comments h3, .comments h4 {
@@ -518,8 +517,8 @@ button[type=submit]:disabled { opacity: 0.5; cursor: default; }
 }
 
 .comment-form-wrap {
-    margin-top: 2.5rem;
-    padding-top: 1.5rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
     border-top: 1px solid #f0ede6;
 }
 

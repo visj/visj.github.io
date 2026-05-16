@@ -322,14 +322,14 @@ func renderFile(path, src, layout string, next *Post) (Post, error) {
 
 func commentSection(path, postURL string) string {
 	slug := strings.TrimPrefix(postURL, "/")
-	var existing string
+	var commentsDiv string
 	if data, err := os.ReadFile(filepath.Join(filepath.Dir(path), "comments.html")); err == nil {
-		existing = "\n" + string(data)
+		if content := strings.TrimSpace(string(data)); content != "" {
+			commentsDiv = "<div class=\"comments-list\">\n<h2>Kommentarer</h2>\n" + content + "\n</div>\n"
+		}
 	}
-	return fmt.Sprintf(`
-<section class="comments" data-post="%s">
-<h2>Kommentarer</h2>%s
-<div class="comment-form-wrap">
+	return fmt.Sprintf(`<section class="comments" data-post="%s">
+%s<div class="comment-form-wrap">
 <h3>Lämna en kommentar</h3>
 <div class="reply-notice" style="display:none">
   Svarar på: <span class="reply-to-name"></span>
@@ -345,7 +345,7 @@ func commentSection(path, postURL string) string {
   <p class="form-status"></p>
 </form>
 </div>
-</section>`, slug, existing)
+</section>`, slug, commentsDiv)
 }
 
 // ── Topic / tag page generation ───────────────────────────────────────────────
