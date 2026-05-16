@@ -24,16 +24,17 @@ body {
     padding: 3rem 1.5rem;
 }
 
-@media (max-width: 600px) {
-    .container {
-        padding: 2rem 1rem;
-    }
-}
-
 .meta-container {
     max-width: 960px;
     margin: 0 auto;
     padding: 3rem 2rem;
+}
+
+@media (max-width: 600px) {
+    .container,
+    .meta-container {
+        padding: 2rem 1rem;
+    }
 }
 
 /* ── Nav ─────────────────────────────────────────────────────────────────── */
@@ -91,22 +92,36 @@ nav {
         right: 0;
         z-index: 100;
         background: #fffffc;
+        transition: background 0.2s ease;
+    }
+
+    nav.nav-scrolled {
+        background: #f2efe9;
     }
 
     .nav-menu {
         flex-wrap: wrap;
         align-items: flex-start;
-        padding: 0.25rem;
+        padding: 0.25rem 0;
     }
 
     .nav-brand {
         flex: 1 1 100%;
-        padding-left: 0.5rem;
+        text-align: center;
+        max-height: 2.5rem;
+        overflow: hidden;
+        opacity: 1;
+        transition: max-height 0.25s ease, opacity 0.2s ease;
+    }
+
+    nav.nav-scrolled .nav-brand {
+        max-height: 0;
+        opacity: 0;
     }
 
     .nav-links {
         flex: 1 1 100%;
-        justify-content: space-between;
+        justify-content: center;
         gap: 0;
     }
 
@@ -115,7 +130,7 @@ nav {
     }
 
     main {
-        padding-top: 4rem;
+        padding-top: 4.5rem;
     }
 }
 
