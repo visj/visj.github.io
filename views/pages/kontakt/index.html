@@ -4,7 +4,7 @@
 </head>
 <body>
     <h1>Kontakt</h1>
-    <p>Skicka ett meddelande här nedan eller mejla direkt på <a href="mailto:mitt.namn@gmail.com">mitt.namn@gmail.com</a>.</p>
+    <p>Skicka ett meddelande här så hör jag av mig.</p>
 
     <form class="contact-form" id="contact-form">
         <div class="form-field">
@@ -12,14 +12,13 @@
             <input id="cf-name" type="text" name="name" required>
         </div>
         <div class="form-field">
-            <label for="cf-email">E-post <span class="field-optional">(valfritt)</span></label>
-            <input id="cf-email" type="email" name="email">
+            <label for="cf-email">E-post</label>
+            <input id="cf-email" type="email" name="email" required>
         </div>
         <div class="form-field">
             <label for="cf-message">Meddelande</label>
             <textarea id="cf-message" name="message" rows="6" required></textarea>
         </div>
-        <div class="cf-turnstile" data-sitekey="0x4AAAAAADQiKUKHRY-f0Np2" data-theme="light"></div>
         <button type="submit">Skicka</button>
         <p class="form-status" id="cf-status"></p>
     </form>
@@ -39,13 +38,12 @@
                     name: this.name.value,
                     email: this.email.value,
                     message: this.message.value,
-                    turnstileToken: this['cf-turnstile-response']?.value ?? '',
                 }),
             })
             status.textContent = r.ok
                 ? 'Tack! Jag återkommer så snart jag kan.'
                 : 'Något gick fel — försök igen eller mejla direkt.'
-            if (r.ok) { this.reset(); turnstile.reset() }
+            if (r.ok) { this.reset() }
         } catch {
             status.textContent = 'Kunde inte skicka. Kontrollera anslutningen.'
         }

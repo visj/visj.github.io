@@ -19,9 +19,15 @@ body {
 /* ── Layout ──────────────────────────────────────────────────────────────── */
 
 .container {
-    max-width: 700px;
+    max-width: 750px;
     margin: 0 auto;
-    padding: 3rem 0rem;
+    padding: 3rem 1.5rem;
+}
+
+@media (max-width: 600px) {
+    .container {
+        padding: 2rem 1rem;
+    }
 }
 
 .meta-container {
@@ -75,6 +81,42 @@ nav {
     flex: 1;
     display: flex;
     justify-content: flex-end;
+}
+
+@media (max-width: 600px) {
+    nav {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 100;
+        background: #fffffc;
+    }
+
+    .nav-menu {
+        flex-wrap: wrap;
+        align-items: flex-start;
+        padding: 0.25rem;
+    }
+
+    .nav-brand {
+        flex: 1 1 100%;
+        padding-left: 0.5rem;
+    }
+
+    .nav-links {
+        flex: 1 1 100%;
+        justify-content: space-between;
+        gap: 0;
+    }
+
+    .nav-right {
+        display: none;
+    }
+
+    main {
+        padding-top: 4rem;
+    }
 }
 
 .nav-links li a {

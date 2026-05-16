@@ -48,14 +48,12 @@ document.addEventListener('DOMContentLoaded', () => {
           name: form.querySelector('[name=name]').value,
           email: form.querySelector('[name=email]').value,
           comment: form.querySelector('[name=comment]').value,
-          turnstileToken: form.querySelector('[name=cf-turnstile-response]')?.value ?? '',
         }),
       })
       if (r.ok) {
         status.textContent = 'Tack. Din kommentar granskas innan publicering.'
         form.reset()
         hideNotice()
-        if (typeof turnstile !== 'undefined') turnstile.reset()
       } else {
         status.textContent = 'Något gick fel — försök igen.'
       }

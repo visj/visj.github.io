@@ -14,7 +14,8 @@ export async function onRequestPost({ request, env }) {
 }
 
 async function verifyTurnstile(token, secret) {
-  if (!token || !secret) return false
+  if (!secret) return true
+  if (!token) return false
   const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
