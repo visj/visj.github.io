@@ -28,21 +28,42 @@ body {
 
 nav {
     border-bottom: 1px solid #ddd;
-    padding: 1.2rem 0;
+    padding: 1.4rem 0;
     margin-bottom: 3rem;
-    font-size: 0.78rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
 }
 
-nav a {
+.nav-brand {
+    display: inline;
+    font-size: 1rem;
+    font-weight: normal;
+    color: #1a1a1a;
+    text-decoration: none;
+    margin-right: 1.2rem;
+}
+
+.nav-menu {
+    display: inline;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.nav-menu li {
+    display: inline;
+}
+
+.nav-menu li a {
+    display: inline-block;
+    font-size: 0.88rem;
     color: #4c4c4c;
     text-decoration: none;
-    margin-right: 1.5rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+    transition: background 0.15s;
 }
 
-nav a:hover {
-    text-decoration: underline;
+.nav-menu li a:hover {
+    background: rgba(0, 0, 0, 0.07);
 }
 
 /* ── Headings ────────────────────────────────────────────────────────────── */
@@ -257,8 +278,6 @@ pre code {
 .byline {
     font-size: 0.82rem;
     color: #777;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
     margin-bottom: 2rem;
     border-bottom: 1px solid #e5e5e5;
     padding-bottom: 1rem;
@@ -292,4 +311,131 @@ pre code {
     opacity: 0;
     transform: translateX(-50%) translateY(0.4rem);
     transition: opacity 0.35s, transform 0.35s;
+}
+
+/* ── References ──────────────────────────────────────────────────────────── */
+
+sup.ref {
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 0.68em;
+    vertical-align: super;
+    line-height: 0;
+    cursor: pointer;
+    color: #888;
+    border-bottom: none;
+    margin-left: 0.05em;
+}
+
+sup.ref:hover {
+    color: #333;
+}
+
+ol.references {
+    margin-top: 1rem;
+    padding-left: 1.5rem;
+    font-size: 0.88rem;
+    color: #555;
+    line-height: 1.6;
+}
+
+ol.references li {
+    margin-bottom: 0.5rem;
+}
+
+ol.references li a {
+    color: #555;
+}
+
+.ref-popup {
+    display: none;
+    position: absolute;
+    width: 300px;
+    background: #fffffc;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    font-size: 0.85rem;
+    line-height: 1.55;
+    color: #333;
+    z-index: 200;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.ref-popup.ref-popup-visible {
+    display: block;
+    opacity: 1;
+}
+
+.ref-popup-body {
+    padding: 0.8rem 1rem 0.6rem;
+}
+
+.ref-popup-footer {
+    padding: 0.45rem 1rem;
+    border-top: 1px solid #eee;
+    text-align: right;
+}
+
+.ref-popup-footer a {
+    font-size: 0.78rem;
+    color: #888;
+    text-decoration: none;
+    letter-spacing: 0.02em;
+}
+
+.ref-popup-footer a:hover {
+    color: #333;
+}
+
+/* ── Listing pages (tags, topics) ────────────────────────────────────────── */
+
+.tag-list, .post-list {
+    list-style: none;
+    padding: 0;
+    margin: 1.5rem 0;
+}
+
+.tag-list li, .post-list li {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    padding: 0.3rem 0;
+    border-bottom: 1px solid #f0ede6;
+}
+
+.tag-list li a, .post-list li a {
+    text-decoration: none;
+    color: #1a1a1a;
+}
+
+.tag-list li a:hover, .post-list li a:hover {
+    text-decoration: underline;
+    text-decoration-color: #aaa;
+}
+
+.tag-count {
+    font-size: 0.78rem;
+    color: #aaa;
+}
+
+.post-list time {
+    font-size: 0.78rem;
+    color: #aaa;
+    font-family: system-ui, -apple-system, sans-serif;
+    margin-left: auto;
+}
+
+.back-link {
+    margin-top: 2rem;
+    font-size: 0.88rem;
+}
+
+.back-link a {
+    color: #888;
+    text-decoration: none;
+}
+
+.back-link a:hover {
+    color: #1a1a1a;
 }

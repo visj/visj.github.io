@@ -63,4 +63,109 @@
         })
     })
 
+    // ── References ────────────────────────────────────────────────────────────
+
+    var refPopup = null
+    var activeRef = null
+
+    function buildRefMap() {
+        var map = {}
+        var counter = 1
+        document.querySelectorAll('sup.ref[data-ref]').forEach(function (sup) {
+            var key = sup.dataset.ref
+            if (!(key in map)) {
+                map[key] = counter++
+            }
+            var n = map[key]
+            sup.textContent = n
+            sup.setAttribute('data-ref-n', n)
+        })
+        return map
+    }
+
+    function showRefPopup(sup) {
+        var key = sup.dataset.ref
+        var li = document.getElementById(key)
+        if (!li) return
+
+        if (!refPopup) {
+            refPopup = document.createElement('div')
+            refPopup.className = 'ref-popup'
+            document.body.appendChild(refPopup)
+            refPopup.addEventListener('click', function (e) {
+                e.stopPropagation()
+            })
+        }
+
+        // Toggle off if clicking the same ref again
+        if (activeRef === sup && refPopup.classList.contains('ref-popup-visible')) {
+            hideRefPopup()
+            return
+        }
+        activeRef = sup
+
+        refPopup.innerHTML = ''
+
+        var body = document.createElement('div')
+        body.className = 'ref-popup-body'
+        body.innerHTML = li.innerHTML
+        refPopup.appendChild(body)
+
+        var footer = document.createElement('div')
+        footer.className = 'ref-popup-footer'
+        var jump = document.createElement('a')
+        jump.href = '#references'
+        jump.textContent = '→ See all references'
+        jump.addEventListener('click', hideRefPopup)
+        footer.appendChild(jump)
+        refPopup.appendChild(footer)
+
+        // Position: measure first pass off-screen
+        refPopup.style.visibility = 'hidden'
+        refPopup.style.display = 'block'
+        refPopup.classList.add('ref-popup-visible')
+
+        var rect = sup.getBoundingClientRect()
+        var pw = refPopup.offsetWidth
+        var margin = 8
+
+        var left = rect.left + window.scrollX
+        var top = rect.bottom + window.scrollY + margin
+
+        // Clamp horizontally
+        var maxLeft = window.innerWidth - pw - 16
+        if (left > maxLeft) left = maxLeft
+        if (left < 16) left = 16
+
+        refPopup.style.left = left + 'px'
+        refPopup.style.top = top + 'px'
+        refPopup.style.visibility = ''
+    }
+
+    function hideRefPopup() {
+        if (refPopup) refPopup.classList.remove('ref-popup-visible')
+        activeRef = null
+    }
+
+    function initReferences() {
+        var sups = document.querySelectorAll('sup.ref[data-ref]')
+        if (!sups.length) return
+
+        buildRefMap()
+
+        sups.forEach(function (sup) {
+            sup.addEventListener('click', function (e) {
+                e.stopPropagation()
+                showRefPopup(sup)
+            })
+        })
+
+        document.addEventListener('click', hideRefPopup)
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') hideRefPopup()
+        })
+    }
+
+    initReferences()
+
 }())
