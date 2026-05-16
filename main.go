@@ -4,9 +4,11 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/hex"
 	"encoding/pem"
 	"flag"
 	"fmt"
@@ -15,6 +17,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -53,6 +56,10 @@ type postSource struct {
 	date string
 }
 
+// assetMap maps original URL paths to hashed URL paths for global assets.
+// e.g. "/css/style.css" → "/css/style.a3f9c1b2.css"
+var assetMap map[string]string
+
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 func main() {
@@ -86,14 +93,26 @@ func build() error {
 	if err := copyDir(assetsDir, distDir); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("copying assets: %w", err)
 	}
-	posts, err := renderContent(string(layout))
+	am, err := buildGlobalAssetMap()
+	if err != nil {
+		return fmt.Errorf("hashing assets: %w", err)
+	}
+	assetMap = am
+
+	cssLink := ""
+	if p, ok := am["/css/style.css"]; ok {
+		cssLink = `<link rel="stylesheet" href="` + p + `">`
+	}
+	layoutStr := strings.ReplaceAll(string(layout), "{{GLOBALCSS}}", cssLink)
+
+	posts, err := renderContent(layoutStr)
 	if err != nil {
 		return err
 	}
-	if err := generateTopics(string(layout), posts); err != nil {
+	if err := generateTopics(layoutStr, posts); err != nil {
 		return err
 	}
-	return generateBrowse(string(layout), posts)
+	return generateBrowse(layoutStr, posts)
 }
 
 func renderContent(layout string) ([]Post, error) {
@@ -202,6 +221,10 @@ func walkViewDir(dir, distPrefix string, fn func(path, src string) error) error 
 			return nil // included by renderFile, not rendered standalone
 		}
 		if !strings.HasSuffix(path, ".html") {
+			ext := strings.ToLower(filepath.Ext(path))
+			if ext == ".css" || ext == ".js" {
+				return nil // handled by renderFile alongside the paired HTML
+			}
 			rel, _ := filepath.Rel(dir, path)
 			dest := filepath.Join(distDir, distPrefix, rel)
 			if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
@@ -235,31 +258,47 @@ func renderFile(path, src, layout string, next *Post) (Post, error) {
 	}
 
 	isPost := strings.HasPrefix(filepath.ToSlash(path), "views/posts/")
+	postURL := urlFromPath(path)
 	if isPost {
-		body += commentSection(path, urlFromPath(path))
+		body += commentSection(path, postURL)
 	}
 	if next != nil {
 		body += fmt.Sprintf("\n<div class=\"post-nav\"><a href=\"%s\">%s →</a></div>", next.URL, next.Title)
 	}
 
+	// Per-view local assets: style.css and script.js next to the HTML file.
+	viewDir := filepath.Dir(path)
+	localCSS, localJS := "", ""
+	if cssURL, err := processViewAsset(filepath.Join(viewDir, "style.css"), postURL); err == nil {
+		localCSS = `<link rel="stylesheet" href="` + cssURL + `">`
+	}
+	if jsURL, err := processViewAsset(filepath.Join(viewDir, "script.js"), postURL); err == nil {
+		localJS = `<script src="` + jsURL + `"></script>`
+	}
+	head = strings.ReplaceAll(head, "{{CSS}}", localCSS)
+	head = strings.ReplaceAll(head, "{{JS}}", localJS)
+	body = strings.ReplaceAll(body, "{{CSS}}", localCSS)
+	body = strings.ReplaceAll(body, "{{JS}}", localJS)
+
 	container := "container"
 	if extractMeta(head, "layout") == "wide" {
 		container = "meta-container"
 	}
-	scripts := "<script src=\"/js/article.js\"></script>"
+	articleJS := assetPath("/js/article.js")
+	scripts := `<script src="` + articleJS + `"></script>`
 	if isPost {
-		scripts += "\n<script src=\"/js/comments.js\"></script>"
+		commentsJS := assetPath("/js/comments.js")
+		scripts += "\n<script src=\"" + commentsJS + "\"></script>"
 	}
 	wrapped := "<div class=\"" + container + "\">\n" + body + "\n</div>\n" + scripts
 	out := strings.ReplaceAll(layout, "{{HEAD}}", head)
 	out = strings.ReplaceAll(out, "{{BODY}}", wrapped)
 
-	url := urlFromPath(path)
 	var dest string
-	if url == "/" {
+	if postURL == "/" {
 		dest = filepath.Join(distDir, "index.html")
 	} else {
-		dest = filepath.Join(distDir, filepath.FromSlash(strings.TrimPrefix(url, "/")), "index.html")
+		dest = filepath.Join(distDir, filepath.FromSlash(strings.TrimPrefix(postURL, "/")), "index.html")
 	}
 	if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
 		return Post{}, err
@@ -276,7 +315,7 @@ func renderFile(path, src, layout string, next *Post) (Post, error) {
 		Date:        date,
 		Tags:        tags,
 		Lang:        langFromPath(path),
-		URL:         urlFromPath(path),
+		URL:         postURL,
 		DestPath:    dest,
 	}, nil
 }
@@ -505,8 +544,8 @@ func urlFromPath(path string) string {
 		}
 		s := filepath.ToSlash(rel)
 		s = strings.TrimSuffix(s, ".html")
-		if strings.HasSuffix(s, "/index") {
-			s = strings.TrimSuffix(s, "/index")
+		if before, ok := strings.CutSuffix(s, "/index"); ok {
+			s = before
 		}
 		if s == "index" {
 			s = ""
@@ -529,8 +568,8 @@ func urlFromPath(path string) string {
 	// fallback
 	rel, _ := filepath.Rel(viewsDir, path)
 	s := strings.TrimSuffix(filepath.ToSlash(rel), ".html")
-	if strings.HasSuffix(s, "/index") {
-		s = strings.TrimSuffix(s, "/index")
+	if before, ok := strings.CutSuffix(s, "/index"); ok {
+		s = before
 	}
 	return "/" + s
 }
@@ -568,6 +607,181 @@ func sortedKeys(m map[string][]Post) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+// ── Asset pipeline ────────────────────────────────────────────────────────────
+
+// assetPath returns the hashed URL for a global asset, falling back to the
+// original path if the asset was not found during the build.
+func assetPath(original string) string {
+	if p, ok := assetMap[original]; ok {
+		return p
+	}
+	return original
+}
+
+func contentHash(data []byte) string {
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])[:8]
+}
+
+// buildGlobalAssetMap minifies + hashes the global CSS and the Bun-minified
+// JS files that Go injects directly into every page.
+func buildGlobalAssetMap() (map[string]string, error) {
+	am := make(map[string]string)
+
+	// CSS: minify with the Go minifier, write hashed file, remove original.
+	cssData, err := os.ReadFile(filepath.Join(assetsDir, "css", "style.css"))
+	if err != nil {
+		return nil, err
+	}
+	minCSS := []byte(minifyCSS(string(cssData)))
+	hash := contentHash(minCSS)
+	hashedCSS := "style." + hash + ".css"
+	if err := os.WriteFile(filepath.Join(distDir, "css", hashedCSS), minCSS, 0644); err != nil {
+		return nil, err
+	}
+	os.Remove(filepath.Join(distDir, "css", "style.css"))
+	am["/css/style.css"] = "/css/" + hashedCSS
+
+	// JS: Bun already minified these into assets/js/; copyDir put them in
+	// dist/js/. Hash and rename them there.
+	for _, name := range []string{"article.js", "comments.js"} {
+		distPath := filepath.Join(distDir, "js", name)
+		data, err := os.ReadFile(distPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return nil, err
+		}
+		hash := contentHash(data)
+		ext := filepath.Ext(name)
+		base := strings.TrimSuffix(name, ext)
+		hashedName := base + "." + hash + ext
+		if err := os.WriteFile(filepath.Join(distDir, "js", hashedName), data, 0644); err != nil {
+			return nil, err
+		}
+		os.Remove(distPath)
+		am["/js/"+name] = "/js/" + hashedName
+	}
+
+	return am, nil
+}
+
+// processViewAsset minifies and hashes a per-view CSS or JS file, writes the
+// result to the page's directory in dist/, and returns its URL. Returns a
+// non-nil error (and empty string) when the file does not exist.
+func processViewAsset(srcPath, pageURL string) (string, error) {
+	ext := strings.ToLower(filepath.Ext(srcPath))
+	base := strings.TrimSuffix(filepath.Base(srcPath), filepath.Ext(srcPath))
+
+	var minified []byte
+	switch ext {
+	case ".css":
+		data, err := os.ReadFile(srcPath)
+		if err != nil {
+			return "", err
+		}
+		minified = []byte(minifyCSS(string(data)))
+	case ".js":
+		data, err := minifyWithBun(srcPath)
+		if err != nil {
+			return "", err
+		}
+		minified = data
+	default:
+		return "", fmt.Errorf("unsupported asset type: %s", ext)
+	}
+
+	hash := contentHash(minified)
+	hashedName := base + "." + hash + ext
+
+	destDir := filepath.Join(distDir, filepath.FromSlash(strings.TrimPrefix(pageURL, "/")))
+	if err := os.MkdirAll(destDir, 0755); err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(filepath.Join(destDir, hashedName), minified, 0644); err != nil {
+		return "", err
+	}
+	return pageURL + "/" + hashedName, nil
+}
+
+// minifyWithBun calls `bun build --minify` on a single file and returns the
+// minified bytes.
+func minifyWithBun(srcPath string) ([]byte, error) {
+	abs, err := filepath.Abs(srcPath)
+	if err != nil {
+		return nil, err
+	}
+	tmp, err := os.MkdirTemp("", "visj-asset-*")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(tmp)
+	cmd := exec.Command("bun", "build", abs, "--outdir", tmp, "--minify", "--target", "browser")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return nil, fmt.Errorf("bun build %s: %v\n%s", srcPath, err, out)
+	}
+	return os.ReadFile(filepath.Join(tmp, filepath.Base(srcPath)))
+}
+
+// minifyCSS strips comments and collapses whitespace around structural
+// characters. Safe for CSS without url() or @import references to local files.
+func minifyCSS(s string) string {
+	// Strip /* ... */ comments.
+	var b strings.Builder
+	for {
+		start := strings.Index(s, "/*")
+		if start == -1 {
+			b.WriteString(s)
+			break
+		}
+		b.WriteString(s[:start])
+		rest := s[start+2:]
+		end := strings.Index(rest, "*/")
+		if end == -1 {
+			break
+		}
+		s = rest[end+2:]
+	}
+	s = b.String()
+
+	// Collapse all whitespace runs to a single space.
+	var buf []byte
+	prevSpace := false
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c == ' ' || c == '\t' || c == '\n' || c == '\r' {
+			if !prevSpace {
+				buf = append(buf, ' ')
+				prevSpace = true
+			}
+		} else {
+			buf = append(buf, c)
+			prevSpace = false
+		}
+	}
+	s = string(buf)
+
+	// Remove spaces around structural characters.
+	for _, pair := range [][2]string{
+		{" {", "{"}, {"{ ", "{"},
+		{" }", "}"}, {"} ", "}"},
+		{" ;", ";"}, {"; ", ";"},
+		{" ,", ","}, {", ", ","},
+		{" :", ":"}, {": ", ":"},
+		{" >", ">"}, {"> ", ">"},
+		{" ~", "~"}, {"~ ", "~"},
+		{" +", "+"}, {"+ ", "+"},
+	} {
+		s = strings.ReplaceAll(s, pair[0], pair[1])
+	}
+
+	// Drop trailing semicolon before closing brace.
+	s = strings.ReplaceAll(s, ";}", "}")
+
+	return strings.TrimSpace(s)
 }
 
 // ── Assets ────────────────────────────────────────────────────────────────────
